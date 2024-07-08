@@ -11,9 +11,9 @@ PLAYER_ROT_SPEED = 0.001
 
 mini_map = [
     [0, 0, 0, 0, 0, 0],
-    [0, 1, 2, 1, 0, 0],
-    [0, 1, 0, 1, 0, 0],
-    [0, 1, 0, 1, 0, 0],
+    [0, 1, 2, 3, 0, 0],
+    [0, 4, 0, 5, 0, 0],
+    [0, 6, 0, 7, 0, 0],
     [0, 0, 0, 0, 0, 0],
     [0, 0, 0, 0, 1, 0],
     [0, 0, 0, 0, 0, 0],
@@ -28,7 +28,7 @@ HALF_FOV = FOV / 2
 NUM_RAYS = 400
 DELTA_ANGLE = FOV / NUM_RAYS
 
-MAX_DEPTH = 20
+MAX_DEPTH = 30
 
 SCREEN_DIST = WIDTH // 2 / math.tan(HALF_FOV)
 SCALE = WIDTH // NUM_RAYS
@@ -45,11 +45,10 @@ class Map:
     def get_map(self):
         for j, row in enumerate(self.mini_map):
             for i, value in enumerate(row):
-                if value:
-                    self.world_map[(i, j)] = value
+                if value: self.world_map[(i, j)] = value
 
     def draw(self, surf):
-        [pg.draw.rect(surf, 'darkgray', (pos[0] * 100, pos[1] * 100, 100, 100), 2)
+        [pg.draw.rect(surf, 'white', (pos[0] * 100, pos[1] * 100, 100, 100), 2)
          for pos in self.world_map]
 
 
@@ -120,11 +119,12 @@ def ray_cast(p: Player, ma: Map, surf):
         delta_depth = dy / sin_a
         dx = delta_depth * cos_a
 
+        wall_type_h = 0
         for i in range(MAX_DEPTH):
             tile_hor = int(x_hor), int(y_hor)
             if tile_hor in ma.world_map:
-                if ma.world_map[tile_hor] == 1:
-                    break
+                wall_type_h = ma.world_map[tile_hor]
+                break
             x_hor += dx
             y_hor += dy
             depth_hor += delta_depth
@@ -138,27 +138,44 @@ def ray_cast(p: Player, ma: Map, surf):
         delta_depth = dx / cos_a
         dy = delta_depth * sin_a
 
+        wall_type_v = 0
         for i in range(MAX_DEPTH):
             tile_vert = int(x_vert), int(y_vert)
             if tile_vert in ma.world_map:
+                wall_type_v = ma.world_map[tile_vert]
                 break
             x_vert += dx
             y_vert += dy
             depth_vert += delta_depth
 
-        if depth_vert < depth_hor: depth = depth_vert
-        else: depth = depth_hor
+        if depth_vert < depth_hor:
+            depth = depth_vert
+            tile_type = wall_type_v
+            offset = y_vert if cos_a > 0 else (1 - y_vert)
+        else:
+            depth = depth_hor
+            tile_type = wall_type_h
+            offset = (1 - x_hor) if sin_a > 0 else x_hor
 
         depth *= math.cos(p.angle - ray_angle)
 
-        proj_height = SCREEN_DIST / (depth + 0.0001)
+        proj_height = SCREEN_DIST / (depth + 0.001)
 
-        pg.draw.rect(surf, color, (ray * SCALE, HEIGHT // 2 - proj_height // 2, SCALE, proj_height))
+        if depth < MAX_DEPTH - 5:
+            col = (156, 214, 228)
 
-        # pg.draw.line(surf, 'blue', (100 * ox, 100 * oy), (100 * ox + 100 * depth * cos_a,
-        #                                                   100 * oy + 100 * depth * sin_a), 2)
+            match tile_type:
+                case 2: col = (250, 235, 215)
+                case 3: col = (127, 255, 212)
+                case 4: col = (0, 127, 255)
+                case 5: col = (245, 245, 220)
+                case 6: col = (255, 228, 196)
+                case 7: col = (255, 235, 205)
+
+            pg.draw.rect(surf, col, (ray * SCALE, HEIGHT // 2 - proj_height // 2, SCALE, proj_height))
 
         ray_angle += DELTA_ANGLE
+
 
 
 screen = pg.display.set_mode(RES)
@@ -178,8 +195,9 @@ while True:
     player.movement(dt)
 
     pg.display.flip()
-    dt = clock.tick(60)
+    dt = clock.tick()
     pg.display.set_caption(f'Raycaster {clock.get_fps()}')
 
     screen.fill((0, 0, 0))
+    raycast_result = []
     ray_cast(player, m, screen)
