@@ -199,5 +199,4 @@ while True:
     pg.display.set_caption(f'Raycaster {clock.get_fps()}')
 
     screen.fill((0, 0, 0))
-    raycast_result = []
     ray_cast(player, m, screen)
