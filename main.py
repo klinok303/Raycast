@@ -25,7 +25,7 @@ PLAYER_ANGLE = 0
 FOV = math.pi / 3
 HALF_FOV = FOV / 2
 
-NUM_RAYS = 400
+NUM_RAYS = WIDTH // 3
 DELTA_ANGLE = FOV / NUM_RAYS
 
 MAX_DEPTH = 30
@@ -175,7 +175,6 @@ def ray_cast(p: Player, ma: Map, surf):
             pg.draw.rect(surf, col, (ray * SCALE, HEIGHT // 2 - proj_height // 2, SCALE, proj_height))
 
         ray_angle += DELTA_ANGLE
-
 
 
 screen = pg.display.set_mode(RES)
