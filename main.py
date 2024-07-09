@@ -11,11 +11,11 @@ PLAYER_ROT_SPEED = 0.001
 
 mini_map = [
     [0, 0, 0, 0, 0, 0],
-    [0, 1, 2, 3, 0, 0],
+    [0, 2, 1, 3, 0, 0],
     [0, 4, 0, 5, 0, 0],
     [0, 6, 0, 7, 0, 0],
     [0, 0, 0, 0, 0, 0],
-    [0, 0, 0, 0, 1, 0],
+    [0, 0, 0, 0, 2, 0],
     [0, 0, 0, 0, 0, 0],
 ]
 
@@ -33,6 +33,17 @@ MAX_DEPTH = 30
 SCREEN_DIST = WIDTH // 2 / math.tan(HALF_FOV)
 SCALE = WIDTH // NUM_RAYS
 
+COL1 = (156, 214, 228)
+COL2 = (250, 235, 215)
+COL3 = (127, 255, 212)
+COL4 = (0, 127, 255)
+COL5 = (245, 245, 220)
+COL6 = (127, 255, 212)
+COL7 = (255, 228, 196)
+
+TEXTURE_SIZE = 1024
+HALF_TEX_SIZE = TEXTURE_SIZE // 2
+
 
 class Map:
     def __init__(self):
@@ -48,7 +59,15 @@ class Map:
                 if value: self.world_map[(i, j)] = value
 
     def draw(self, surf):
-        [pg.draw.rect(surf, 'white', (pos[0] * 100, pos[1] * 100, 100, 100), 2)
+        pg.draw.rect(surf, COL1, (0, 0, len(mini_map[0]) * 25, len(mini_map) * 25), 100)
+
+        for x in range(0, len(mini_map[0]) + 1):
+            pg.draw.line(screen, 'black', (x * 25, 0), (x * 25, len(mini_map) * 25), 1)
+
+        for y in range(0, len(mini_map) + 1):
+            pg.draw.line(screen, 'black', (0, y * 25), (len(mini_map[0]) * 25, y * 25), 1)
+
+        [pg.draw.rect(surf, COL2, (pos[0] * 25, pos[1] * 25, 25, 25), 5)
          for pos in self.world_map]
 
 
@@ -88,10 +107,8 @@ class Player:
         self.angle %= math.tau
 
     def draw(self, surf):
-        pg.draw.line(surf, 'red', (self.x * 100, self.y * 100),
-                    (self.x * 100 + WIDTH * math.cos(self.angle), self.y * 100 + WIDTH * math.sin(self.angle)),
-                     1)
-        pg.draw.circle(surf, 'green', (self.x * 100, self.y * 100), 15)
+        pg.draw.circle(surf, (0, 0, 0), (self.x * 25, self.y * 25), 10)
+        pg.draw.circle(surf, COL3, (self.x * 25, self.y * 25), 5)
 
     @property
     def pos(self): return self.x, self.y
@@ -100,6 +117,7 @@ class Player:
 
 
 def ray_cast(p: Player, ma: Map, surf):
+    ray_cast_result = []
     ox, oy = p.pos
     x_map, y_map = p.map_pos
 
@@ -151,10 +169,12 @@ def ray_cast(p: Player, ma: Map, surf):
         if depth_vert < depth_hor:
             depth = depth_vert
             tile_type = wall_type_v
+            y_vert %= 1
             offset = y_vert if cos_a > 0 else (1 - y_vert)
         else:
             depth = depth_hor
             tile_type = wall_type_h
+            x_hor %= 1
             offset = (1 - x_hor) if sin_a > 0 else x_hor
 
         depth *= math.cos(p.angle - ray_angle)
@@ -162,22 +182,35 @@ def ray_cast(p: Player, ma: Map, surf):
         proj_height = SCREEN_DIST / (depth + 0.001)
 
         if depth < MAX_DEPTH - 5:
-            col = (156, 214, 228)
+            if tile_type == 1:
+                col = COL2
+                pg.draw.rect(surf, (col[0] / (1 + depth ** 5 * 0.001), col[1] / (1 + depth ** 5 * 0.001),
+                                    col[2] / (1 + depth ** 5 * 0.001)), (ray * SCALE,
+                                                                         HEIGHT // 2 - proj_height // 2,
+                                                                         SCALE, proj_height))
 
-            match tile_type:
-                case 2: col = (250, 235, 215)
-                case 3: col = (127, 255, 212)
-                case 4: col = (0, 127, 255)
-                case 5: col = (245, 245, 220)
-                case 6: col = (255, 228, 196)
-                case 7: col = (255, 235, 205)
+            else:
+                wall_column = walls_textures[tile_type].subsurface(
+                    offset * (TEXTURE_SIZE - SCALE), 0, SCALE, TEXTURE_SIZE
+                )
+                wall_column = pg.transform.scale(wall_column, (SCALE, proj_height))
+                wall_pos = (ray * SCALE, HEIGHT // 2 - proj_height // 2)
 
-            pg.draw.rect(surf, col, (ray * SCALE, HEIGHT // 2 - proj_height // 2, SCALE, proj_height))
+                surf.blit(wall_column, wall_pos)
 
         ray_angle += DELTA_ANGLE
+    return ray_cast_result
 
 
 screen = pg.display.set_mode(RES)
+walls_textures = {
+    2: pg.transform.scale(pg.image.load('textures/Wall1.png').convert_alpha(), (TEXTURE_SIZE, TEXTURE_SIZE)),
+    3: pg.transform.scale(pg.image.load('textures/Wall2.jpg').convert_alpha(), (TEXTURE_SIZE, TEXTURE_SIZE)),
+    4: pg.transform.scale(pg.image.load('textures/Wall3.png').convert_alpha(), (TEXTURE_SIZE, TEXTURE_SIZE)),
+    5: pg.transform.scale(pg.image.load('textures/Wall4.jpg').convert_alpha(), (TEXTURE_SIZE, TEXTURE_SIZE)),
+    6: pg.transform.scale(pg.image.load('textures/Wall5.png').convert_alpha(), (TEXTURE_SIZE, TEXTURE_SIZE)),
+    7: pg.transform.scale(pg.image.load('textures/Wall6.jpg').convert_alpha(), (TEXTURE_SIZE, TEXTURE_SIZE)),
+}
 clock = pg.time.Clock()
 m = Map()
 player = Player()
@@ -199,3 +232,5 @@ while True:
 
     screen.fill((0, 0, 0))
     ray_cast(player, m, screen)
+    m.draw(screen)
+    player.draw(screen)
